@@ -1,0 +1,6 @@
+[submodule "dependencies/submodules/ida-sdk"]
+	path = dependencies/submodules/ida-sdk
+	url = https://github.com/hexRaysSA/ida-sdk.git
+[submodule "dependencies/submodules/ida-sdk/ida-cmake"]
+	path = dependencies/submodules/ida-sdk/ida-cmake
+	url = https://github.com/allthingsida/ida-cmake.git
