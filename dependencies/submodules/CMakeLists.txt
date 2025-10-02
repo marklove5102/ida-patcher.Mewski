@@ -1,1 +1,2 @@
-set(IDA_SDK_PATH ${CMAKE_CURRENT_SOURCE_DIR}/ida-sdk)
+# json
+add_subdirectory(json)

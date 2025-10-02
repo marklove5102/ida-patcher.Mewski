@@ -1,33 +1,12 @@
-BasedOnStyle: LLVM
-
-IndentWidth: 2
+BasedOnStyle: Google
 TabWidth: 2
-UseTab: Never
-
-BreakBeforeBraces: Attach
-
-ColumnLimit: 80
-MaxEmptyLinesToKeep: 1
-
-SpaceBeforeParens: ControlStatements
-SpaceInEmptyParentheses: false
-SpacesInParentheses: false
-SpacesInSquareBrackets: false
-
-AlignAfterOpenBracket: Align
-AlignConsecutiveAssignments: false
-AlignConsecutiveDeclarations: false
-AlignOperands: true
-
+ColumnLimit: 100
+ContinuationIndentWidth: 2
+AlignAfterOpenBracket: BlockIndent
 AllowShortIfStatementsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: Empty
-AllowShortBlocksOnASingleLine: false
-
-PointerAlignment: Left
+BinPackArguments: false
+BinPackParameters: false
 ReferenceAlignment: Left
-
-SortIncludes: true
 IncludeBlocks: Preserve
-
-NamespaceIndentation: None
