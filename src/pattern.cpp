@@ -217,13 +217,13 @@ static inline bool match_at_position_avx512(
 
   // Load 64 bytes from data (unaligned load is fine, just slightly slower)
   __m512i data_vec = _mm512_loadu_si512((__m512i*)data);
-  
+
   // XOR data with pattern - matching bytes become 0, different bytes become non-zero
   __m512i xor_result = _mm512_xor_si512(data_vec, pattern.simd_pattern);
-  
+
   // Apply mask - zeros out wildcard positions (0x00 mask) so they don't affect comparison
   __m512i masked_diff = _mm512_and_si512(xor_result, pattern.simd_mask);
-  
+
   // Compare with zero - returns bitmask where 1 = byte matched (was zero after mask)
   __mmask64 cmp_mask = _mm512_cmpeq_epi8_mask(masked_diff, _mm512_setzero_si512());
 
@@ -362,7 +362,7 @@ void apply_pattern_patch(
     for (int j = 0; j < 2; ++j) {
       if (!replace_pattern[i].nibble[j].wildcard) {
         // Non-wildcard: use the replacement value
-        
+
         // Validate nibble data is in valid range (0-15)
         if (replace_pattern[i].nibble[j].data > 15) {
           throw std::runtime_error("Invalid nibble data: value exceeds 15");
@@ -376,7 +376,7 @@ void apply_pattern_patch(
         new_byte |= (data[i] & (0xF0 >> (j * 4)));
       }
     }
-    
+
     // Write the constructed byte back to data
     data[i] = new_byte;
   }
