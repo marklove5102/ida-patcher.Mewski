@@ -124,7 +124,11 @@ void apply_patches(const std::vector<patch_t>& patches) {
       if (!GetModuleInformation(
             GetCurrentProcess(), module_handle, &module_info, sizeof(module_info)
           )) {
-        msg("Failed to get module information: %s (patch: %s)\n", module_name.c_str(), patch.name.c_str());
+        msg(
+          "Failed to get module information: %s (patch: %s)\n",
+          module_name.c_str(),
+          patch.name.c_str()
+        );
         continue;
       }
 
@@ -148,9 +152,19 @@ void apply_patches(const std::vector<patch_t>& patches) {
         if (!WriteProcessMemory(
               GetCurrentProcess(), data + location, buffer.data(), buffer_size, nullptr
             )) {
-          msg("Failed to write memory for patch: %s at 0x%p in %s\n", patch.name.c_str(), data + location, module_name.c_str());
+          msg(
+            "Failed to write memory for patch: %s at 0x%p in %s\n",
+            patch.name.c_str(),
+            data + location,
+            module_name.c_str()
+          );
         } else {
-          msg("Applied patch: %s at 0x%p in %s\n", patch.name.c_str(), data + location, module_name.c_str());
+          msg(
+            "Applied patch: %s at 0x%p in %s\n",
+            patch.name.c_str(),
+            data + location,
+            module_name.c_str()
+          );
         }
       }
     }
@@ -173,7 +187,7 @@ BOOL WINAPI DllMain(HINSTANCE module, DWORD reason, LPVOID) {
 
       apply_patches(patches);
     } catch (const std::exception& e) {
-      msg("ida-patcher error: %s\n", e.what());
+      msg("Error: %s\n", e.what());
     }
   }
 
