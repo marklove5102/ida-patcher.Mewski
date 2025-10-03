@@ -50,6 +50,7 @@ std::filesystem::path get_config_path(HMODULE module_handle) {
     throw std::runtime_error("Failed to get module file name");
   }
 
+  // Look for config file in same directory as the DLL
   std::filesystem::path config_path =
     std::filesystem::path(module_path).parent_path() / "ida-patcher.json";
   return config_path;
@@ -111,6 +112,7 @@ void apply_patches(const std::vector<patch_t>& patches) {
       continue;
     }
 
+    // Get module memory range for pattern searching
     MODULEINFO module_info;
     if (!GetModuleInformation(
           GetCurrentProcess(), module_handle, &module_info, sizeof(module_info)
@@ -128,6 +130,7 @@ void apply_patches(const std::vector<patch_t>& patches) {
     }
 
     std::vector<std::size_t> matches = find_pattern(data, data_size, patch.search);
+
     if (matches.empty()) {
       msg("Pattern not found: %s\n", patch.name.c_str());
       continue;
@@ -137,6 +140,7 @@ void apply_patches(const std::vector<patch_t>& patches) {
       std::size_t buffer_size = patch.replace.size();
       std::vector<std::uint8_t> buffer(buffer_size);
       memcpy(buffer.data(), data + location, buffer_size);
+      // Apply replacement pattern (handles wildcards by preserving original bytes)
       apply_pattern_patch(buffer.data(), buffer_size, patch.replace);
 
       if (!WriteProcessMemory(
@@ -153,6 +157,7 @@ void apply_patches(const std::vector<patch_t>& patches) {
 BOOL WINAPI DllMain(HINSTANCE module, DWORD reason, LPVOID) {
   if (reason == DLL_PROCESS_ATTACH) {
     try {
+      // Prevent multiple instances from running simultaneously
       std::string mutex_name = std::format("ida-patcher-{}", GetCurrentProcessId());
 
       HANDLE mutex_handle = CreateMutexA(nullptr, FALSE, mutex_name.c_str());
