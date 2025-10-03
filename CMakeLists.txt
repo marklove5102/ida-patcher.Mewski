@@ -13,6 +13,8 @@ add_subdirectory(dependencies)
 
 add_library(ida-patcher SHARED
     src/plugin.cpp
+    src/pattern.cpp
+    src/pattern.hpp
 )
 
 target_link_libraries(ida-patcher PRIVATE

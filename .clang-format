@@ -10,3 +10,6 @@ BinPackArguments: false
 BinPackParameters: false
 ReferenceAlignment: Left
 IncludeBlocks: Preserve
+SortIncludes: false
+DerivePointerAlignment: false
+PointerAlignment: Left
