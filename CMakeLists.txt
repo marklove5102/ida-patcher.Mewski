@@ -9,8 +9,6 @@ set(ENV{IDASDK} ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/submodules/ida-sdk/src)
 include(dependencies/submodules/ida-cmake/bootstrap.cmake)
 find_package(idasdk REQUIRED)
 
-enable_testing()
-
 add_subdirectory(dependencies)
 
 add_library(ida-patcher SHARED
@@ -23,10 +21,3 @@ target_link_libraries(ida-patcher PRIVATE
     idasdk::plugin
     nlohmann_json::nlohmann_json
 )
-
-add_library(ida-patcher-core STATIC
-    src/pattern.cpp
-    src/pattern.hpp
-)
-
-add_subdirectory(tests)

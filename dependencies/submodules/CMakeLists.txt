@@ -1,5 +1,5 @@
 # json
 add_subdirectory(json)
 
-# googletest
-add_subdirectory(googletest)
+# Catch2
+add_subdirectory(Catch2)

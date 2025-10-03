@@ -1,8 +1,8 @@
-#include <windows.h>
-#include <psapi.h>
-
 #include <format>
 #include <fstream>
+
+#include <windows.h>
+#include <psapi.h>
 
 #include <nlohmann/json.hpp>
 

@@ -7,3 +7,6 @@
 [submodule "dependencies/submodules/json"]
 	path = dependencies/submodules/json
 	url = https://github.com/nlohmann/json.git
+[submodule "dependencies/submodules/Catch2"]
+	path = dependencies/submodules/Catch2
+	url = https://github.com/catchorg/Catch2.git
