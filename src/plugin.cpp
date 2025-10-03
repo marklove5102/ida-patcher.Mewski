@@ -39,7 +39,7 @@ plugin_t PLUGIN = {
 struct patch_t {
   std::string name;
   bool enabled;
-  std::string module;
+  std::vector<std::string> modules;
   std::vector<pattern_byte_t> search;
   std::vector<pattern_byte_t> replace;
 };
@@ -84,7 +84,7 @@ std::vector<patch_t> parse_config(const std::filesystem::path& path) {
       patches.push_back(
         {patch["name"].get<std::string>(),
          patch["enabled"].get<bool>(),
-         patch["module"].get<std::string>(),
+         patch["modules"].get<std::vector<std::string>>(),
          search_pattern,
          replace_pattern}
       );
@@ -106,50 +106,53 @@ void apply_patches(const std::vector<patch_t>& patches) {
       continue;
     }
 
-    HMODULE module_handle = GetModuleHandleA(patch.module.c_str());
-    if (module_handle == nullptr) {
-      msg("Module not found: %s\n", patch.module.c_str());
-      continue;
-    }
-
-    // Get module memory range for pattern searching
-    MODULEINFO module_info;
-    if (!GetModuleInformation(
-          GetCurrentProcess(), module_handle, &module_info, sizeof(module_info)
-        )) {
-      msg("Failed to get module information: %s\n", patch.module.c_str());
-      continue;
-    }
-
-    auto* data = reinterpret_cast<std::uint8_t*>(module_info.lpBaseOfDll);
-    auto data_size = static_cast<std::size_t>(module_info.SizeOfImage);
-
     if (patch.search.size() != patch.replace.size()) {
       msg("Search and replace patterns must be of the same length: %s\n", patch.name.c_str());
       continue;
     }
 
-    std::vector<std::size_t> matches = find_pattern(data, data_size, patch.search);
-
-    if (matches.empty()) {
-      msg("Pattern not found: %s\n", patch.name.c_str());
-      continue;
-    }
-
-    for (std::size_t location : matches) {
-      std::size_t buffer_size = patch.replace.size();
-      std::vector<std::uint8_t> buffer(buffer_size);
-      memcpy(buffer.data(), data + location, buffer_size);
-      // Apply replacement pattern (handles wildcards by preserving original bytes)
-      apply_pattern_patch(buffer.data(), buffer_size, patch.replace);
-
-      if (!WriteProcessMemory(
-            GetCurrentProcess(), data + location, buffer.data(), buffer_size, nullptr
-          )) {
-        msg("Failed to write memory for patch: %s at 0x%p\n", patch.name.c_str(), data + location);
+    // Iterate through all modules for this patch
+    for (const auto& module_name : patch.modules) {
+      HMODULE module_handle = GetModuleHandleA(module_name.c_str());
+      if (module_handle == nullptr) {
+        msg("Module not found: %s (patch: %s)\n", module_name.c_str(), patch.name.c_str());
+        continue;
       }
 
-      msg("Applied patch: %s at 0x%p\n", patch.name.c_str(), data + location);
+      // Get module memory range for pattern searching
+      MODULEINFO module_info;
+      if (!GetModuleInformation(
+            GetCurrentProcess(), module_handle, &module_info, sizeof(module_info)
+          )) {
+        msg("Failed to get module information: %s (patch: %s)\n", module_name.c_str(), patch.name.c_str());
+        continue;
+      }
+
+      auto* data = reinterpret_cast<std::uint8_t*>(module_info.lpBaseOfDll);
+      auto data_size = static_cast<std::size_t>(module_info.SizeOfImage);
+
+      std::vector<std::size_t> matches = find_pattern(data, data_size, patch.search);
+
+      if (matches.empty()) {
+        msg("Pattern not found in %s (patch: %s)\n", module_name.c_str(), patch.name.c_str());
+        continue;
+      }
+
+      for (std::size_t location : matches) {
+        std::size_t buffer_size = patch.replace.size();
+        std::vector<std::uint8_t> buffer(buffer_size);
+        memcpy(buffer.data(), data + location, buffer_size);
+        // Apply replacement pattern (handles wildcards by preserving original bytes)
+        apply_pattern_patch(buffer.data(), buffer_size, patch.replace);
+
+        if (!WriteProcessMemory(
+              GetCurrentProcess(), data + location, buffer.data(), buffer_size, nullptr
+            )) {
+          msg("Failed to write memory for patch: %s at 0x%p in %s\n", patch.name.c_str(), data + location, module_name.c_str());
+        } else {
+          msg("Applied patch: %s at 0x%p in %s\n", patch.name.c_str(), data + location, module_name.c_str());
+        }
+      }
     }
   }
 }
