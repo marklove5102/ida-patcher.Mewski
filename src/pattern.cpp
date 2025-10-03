@@ -29,17 +29,20 @@ struct pattern_simd_t {
  * @return true if AVX-512F is supported, false otherwise
  */
 static bool has_avx512f() {
+  // Cache the result to avoid repeated CPUID calls
   static bool checked = false;
   static bool supported = false;
 
   if (!checked) {
     int cpuInfo[4];
+    // Get maximum supported CPUID function
     __cpuid(cpuInfo, 0);
     int max_function_id = cpuInfo[0];
 
+    // Extended features are available via function 7
     if (max_function_id >= 7) {
       __cpuidex(cpuInfo, 7, 0);
-      // Check AVX-512F bit (bit 16 in EBX)
+      // Check AVX-512F bit (bit 16 in EBX register)
       supported = (cpuInfo[1] & (1 << 16)) != 0;
     }
     checked = true;
@@ -73,6 +76,7 @@ std::vector<pattern_byte_t> parse_pattern(const std::string& pattern) {
       continue;
     }
 
+    // Parse one byte (two nibbles: high then low)
     pattern_byte_t byte = {};
     for (auto& j : byte.nibble) {
       if (i >= pattern.length()) {
@@ -80,10 +84,12 @@ std::vector<pattern_byte_t> parse_pattern(const std::string& pattern) {
       }
 
       if (pattern[i] == '?') {
+        // Wildcard nibble - matches any value
         j.wildcard = true;
         j.data = 0;
         ++i;
       } else if (isxdigit(pattern[i])) {
+        // Hex digit - matches specific value
         j.wildcard = false;
         // Convert hex char to nibble value: '0'-'9' -> 0-9, 'a'-'f' -> 10-15
         j.data = static_cast<std::uint8_t>(
@@ -113,9 +119,11 @@ std::vector<pattern_byte_t> parse_pattern(const std::string& pattern) {
  * @return true if both nibbles match, false otherwise
  */
 bool match_pattern_byte(std::uint8_t byte, const pattern_byte_t& pattern_byte) {
-  std::uint8_t high_nibble = (byte >> 4) & 0x0F;
-  std::uint8_t low_nibble = byte & 0x0F;
+  // Extract nibbles from byte
+  std::uint8_t high_nibble = (byte >> 4) & 0x0F;  // Upper 4 bits
+  std::uint8_t low_nibble = byte & 0x0F;          // Lower 4 bits
 
+  // Check if each nibble matches (wildcard or exact match)
   bool high_match = pattern_byte.nibble[0].wildcard || (high_nibble == pattern_byte.nibble[0].data);
   bool low_match = pattern_byte.nibble[1].wildcard || (low_nibble == pattern_byte.nibble[1].data);
 
@@ -141,40 +149,43 @@ static pattern_simd_t prepare_simd_pattern(const std::vector<pattern_byte_t>& pa
   pattern_simd_t result;
   result.length = pattern.size();
 
-  // Only enable SIMD if CPU supports AVX-512F and pattern is suitable
+  // Only enable SIMD if CPU supports AVX-512F and pattern fits in one register (64 bytes)
   result.can_use_full_simd = has_avx512f() && !pattern.empty() && pattern.size() <= 64;
 
   if (result.can_use_full_simd) {
     result.bytes.resize(pattern.size());
     result.mask_bytes.resize(pattern.size());
 
-    // Analyze pattern to see if it's SIMD-compatible
+    // Analyze each byte to determine if pattern is SIMD-compatible
     for (size_t i = 0; i < pattern.size(); ++i) {
       const auto& pb = pattern[i];
 
       bool both_wildcard = pb.nibble[0].wildcard && pb.nibble[1].wildcard;
       if (both_wildcard) {
-        // Full byte wildcard: don't check this byte at all
+        // Full byte wildcard (??): mask = 0x00 means ignore this byte
         result.bytes[i] = 0x00;
         result.mask_bytes[i] = 0x00;
       } else if (!pb.nibble[0].wildcard && !pb.nibble[1].wildcard) {
-        // Both nibbles specified: combine into full byte and check everything
+        // Both nibbles specified (AB): combine into full byte, mask = 0xFF means check all bits
         result.bytes[i] = (pb.nibble[0].data << 4) | pb.nibble[1].data;
         result.mask_bytes[i] = 0xFF;
       } else {
-        // Mixed wildcard (e.g., "?F" or "A?"): too complex for simple SIMD
+        // Mixed wildcard (?F or A?): can't efficiently handle with simple SIMD mask
         result.can_use_full_simd = false;
         break;
       }
     }
 
     if (result.can_use_full_simd && result.length <= 64) {
+      // Create aligned buffers for loading into AVX-512 registers
       alignas(64) std::uint8_t pattern_buffer[64] = {0};
       alignas(64) std::uint8_t mask_buffer[64] = {0};
 
+      // Copy pattern data into aligned buffers
       std::memcpy(pattern_buffer, result.bytes.data(), result.length);
       std::memcpy(mask_buffer, result.mask_bytes.data(), result.length);
 
+      // Load into SIMD registers for fast parallel comparison
       result.simd_pattern = _mm512_load_si512((__m512i*)pattern_buffer);
       result.simd_mask = _mm512_load_si512((__m512i*)mask_buffer);
     }
@@ -204,15 +215,23 @@ static inline bool match_at_position_avx512(
     return false;
   }
 
+  // Load 64 bytes from data (unaligned load is fine, just slightly slower)
   __m512i data_vec = _mm512_loadu_si512((__m512i*)data);
+  
+  // XOR data with pattern - matching bytes become 0, different bytes become non-zero
   __m512i xor_result = _mm512_xor_si512(data_vec, pattern.simd_pattern);
+  
+  // Apply mask - zeros out wildcard positions (0x00 mask) so they don't affect comparison
   __m512i masked_diff = _mm512_and_si512(xor_result, pattern.simd_mask);
+  
+  // Compare with zero - returns bitmask where 1 = byte matched (was zero after mask)
   __mmask64 cmp_mask = _mm512_cmpeq_epi8_mask(masked_diff, _mm512_setzero_si512());
 
-  // Create mask for pattern length since we might not use all 64 bytes
+  // Create mask for actual pattern length (we may not use all 64 bytes)
   uint64_t length_mask =
     (pattern.length == 64) ? 0xFFFFFFFFFFFFFFFFULL : ((1ULL << pattern.length) - 1);
 
+  // Pattern matches if all relevant bytes matched
   return (cmp_mask & length_mask) == length_mask;
 }
 
@@ -236,35 +255,39 @@ std::vector<std::size_t> find_pattern(
 ) {
   std::vector<std::size_t> matches;
 
+  // Early exit for invalid inputs
   if (data == nullptr || pattern.empty() || data_size == 0 || data_size < pattern.size()) {
     return matches;
   }
 
+  // Last position where pattern could possibly start
   const std::size_t end_pos = data_size - pattern.size();
 
-  // Try SIMD optimization for suitable patterns
+  // Attempt SIMD acceleration for suitable patterns on capable CPUs
   if (pattern.size() <= 64 && has_avx512f()) {
     pattern_simd_t simd_pattern = prepare_simd_pattern(pattern);
 
     if (simd_pattern.can_use_full_simd && data_size >= 64) {
-      // SIMD path: process chunks that are safe to read 64 bytes from
+      // SIMD path: we can safely read 64 bytes up to this position
       const std::size_t simd_end_pos = (data_size >= 64) ? data_size - 64 : 0;
 
+      // Process all positions where we can safely load 64 bytes using SIMD
       for (std::size_t i = 0; i <= end_pos && i <= simd_end_pos; ++i) {
         if (match_at_position_avx512(data + i, simd_pattern)) {
           matches.push_back(i);
         }
       }
 
-      // Handle remaining positions with scalar fallback if needed
+      // Handle tail positions with scalar matching (if pattern extends beyond safe SIMD region)
       const std::size_t scalar_start = simd_end_pos + 1;
       if (scalar_start <= end_pos) {
         for (std::size_t i = scalar_start; i <= end_pos; ++i) {
           bool match = true;
+          // Check each byte in pattern
           for (std::size_t j = 0; j < pattern.size(); ++j) {
             if (!match_pattern_byte(data[i + j], pattern[j])) {
               match = false;
-              break;
+              break;  // Early exit on first mismatch
             }
           }
           if (match) {
@@ -277,12 +300,14 @@ std::vector<std::size_t> find_pattern(
     }
   }
 
+  // Scalar fallback: byte-by-byte matching for all patterns that can't use SIMD
   for (std::size_t i = 0; i <= end_pos; ++i) {
     bool match = true;
+    // Check each byte in pattern
     for (std::size_t j = 0; j < pattern.size(); ++j) {
       if (!match_pattern_byte(data[i + j], pattern[j])) {
         match = false;
-        break;
+        break;  // Early exit on first mismatch
       }
     }
     if (match) {
@@ -329,24 +354,30 @@ void apply_pattern_patch(
     throw std::out_of_range("Patch size exceeds data size");
   }
 
+  // Process each byte in the replacement pattern
   for (std::size_t i = 0; i < replace_pattern.size(); ++i) {
     std::uint8_t new_byte = 0;
 
     // Build byte from two nibbles: j=0 is high nibble, j=1 is low nibble
     for (int j = 0; j < 2; ++j) {
       if (!replace_pattern[i].nibble[j].wildcard) {
+        // Non-wildcard: use the replacement value
+        
         // Validate nibble data is in valid range (0-15)
         if (replace_pattern[i].nibble[j].data > 15) {
           throw std::runtime_error("Invalid nibble data: value exceeds 15");
         }
 
-        // Use replacement nibble: shift to correct position
+        // Shift nibble to correct position: high nibble << 4, low nibble << 0
         new_byte |= (replace_pattern[i].nibble[j].data << ((1 - j) * 4));
       } else {
-        // Preserve original nibble: mask out the correct 4 bits
+        // Wildcard: preserve the original nibble value
+        // 0xF0 for high nibble (j=0), 0x0F for low nibble (j=1)
         new_byte |= (data[i] & (0xF0 >> (j * 4)));
       }
     }
+    
+    // Write the constructed byte back to data
     data[i] = new_byte;
   }
 }
