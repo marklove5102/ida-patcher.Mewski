@@ -19,7 +19,8 @@ std::vector<pattern_byte_t> parse_pattern(const std::string& pattern) {
   size_t i = 0;
 
   while (i < pattern.length()) {
-    if (pattern[i] == ' ') {
+    // Skip all whitespace
+    if (pattern[i] == ' ' || pattern[i] == '\t' || pattern[i] == '\n' || pattern[i] == '\r') {
       ++i;
       continue;
     }
@@ -65,7 +66,7 @@ bool match_pattern_byte(std::uint8_t byte, const pattern_byte_t& pattern_byte) {
 static pattern_simd_t prepare_simd_pattern(const std::vector<pattern_byte_t>& pattern) {
   pattern_simd_t result;
   result.length = pattern.size();
-  result.can_use_full_simd = (pattern.size() <= 64);
+  result.can_use_full_simd = false;  // Disable SIMD for now to avoid crashes
   result.bytes.resize(pattern.size());
   result.mask_bytes.resize(pattern.size());
 
@@ -127,7 +128,7 @@ std::vector<std::size_t> find_pattern(
 ) {
   std::vector<std::size_t> matches;
 
-  if (pattern.empty() || data_size < pattern.size()) {
+  if (data == nullptr || pattern.empty() || data_size == 0 || data_size < pattern.size()) {
     return matches;
   }
 
@@ -165,15 +166,29 @@ std::vector<std::size_t> find_pattern(
 void apply_pattern_patch(
   std::uint8_t* data, std::size_t data_size, const std::vector<pattern_byte_t>& replace_pattern
 ) {
+  if (data == nullptr) {
+    throw std::invalid_argument("Data pointer is null");
+  }
+  
+  if (replace_pattern.empty()) {
+    return; // Nothing to patch
+  }
+  
   if (replace_pattern.size() > data_size) {
-    throw std::out_of_range("Patch location out of range");
+    throw std::out_of_range("Patch size exceeds data size");
   }
 
   for (std::size_t i = 0; i < replace_pattern.size(); ++i) {
     std::uint8_t new_byte = 0;
+    
     // Build byte from two nibbles: j=0 is high nibble, j=1 is low nibble
     for (int j = 0; j < 2; ++j) {
       if (!replace_pattern[i].nibble[j].wildcard) {
+        // Validate nibble data is in valid range (0-15)
+        if (replace_pattern[i].nibble[j].data > 15) {
+          throw std::runtime_error("Invalid nibble data: value exceeds 15");
+        }
+        
         // Use replacement nibble: shift to correct position
         new_byte |= (replace_pattern[i].nibble[j].data << ((1 - j) * 4));
       } else {
