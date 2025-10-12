@@ -94,16 +94,16 @@ module_handle_t get_module_handle(const std::string& module_name) {
   if (handle != nullptr) {
     return handle;
   }
-  
+
   // If not found by direct name, search through loaded modules
   // This callback searches for a module by name
   struct callback_data {
     std::string target_name;
     void* result;
   };
-  
+
   callback_data data{module_name, nullptr};
-  
+
   dl_iterate_phdr(
     [](struct dl_phdr_info* info, size_t size, void* data_ptr) -> int {
       auto* cb_data = static_cast<callback_data*>(data_ptr);
@@ -121,7 +121,7 @@ module_handle_t get_module_handle(const std::string& module_name) {
     },
     &data
   );
-  
+
   return data.result;
 #else
   return dlopen(module_name.c_str(), RTLD_NOLOAD | RTLD_NOW);
@@ -153,14 +153,14 @@ bool get_module_info(module_handle_t module_handle, void** base_address, size_t*
   // On macOS, module_handle is the mach_header pointer
   const mach_header_64* header = reinterpret_cast<const mach_header_64*>(module_handle);
   *base_address = module_handle;
-  
+
   // Calculate total size by iterating through load commands
   size_t total_size = 0;
   const uint8_t* cmd_ptr = reinterpret_cast<const uint8_t*>(header) + sizeof(mach_header_64);
-  
+
   for (uint32_t i = 0; i < header->ncmds; i++) {
     const auto* cmd = reinterpret_cast<const load_command*>(cmd_ptr);
-    
+
     if (cmd->cmd == LC_SEGMENT_64) {
       const auto* seg = reinterpret_cast<const segment_command_64*>(cmd);
       // Calculate the end of this segment
@@ -169,10 +169,10 @@ bool get_module_info(module_handle_t module_handle, void** base_address, size_t*
         total_size = seg_end;
       }
     }
-    
+
     cmd_ptr += cmd->cmdsize;
   }
-  
+
   *size = total_size;
   return true;
 #elif defined(__linux__)
@@ -180,14 +180,14 @@ bool get_module_info(module_handle_t module_handle, void** base_address, size_t*
   if (map == nullptr) {
     return false;
   }
-  
+
   // Get base address from link_map
   *base_address = reinterpret_cast<void*>(map->l_addr);
-  
+
   // Parse ELF header to calculate actual module size
   const auto* ehdr = reinterpret_cast<const ElfW(Ehdr)*>(map->l_addr);
   const auto* phdr = reinterpret_cast<const ElfW(Phdr)*>(map->l_addr + ehdr->e_phoff);
-  
+
   size_t max_addr = 0;
   for (ElfW(Half) i = 0; i < ehdr->e_phnum; i++) {
     if (phdr[i].p_type == PT_LOAD) {
@@ -197,7 +197,7 @@ bool get_module_info(module_handle_t module_handle, void** base_address, size_t*
       }
     }
   }
-  
+
   *size = max_addr;
   return true;
 #endif
