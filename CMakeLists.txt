@@ -42,7 +42,7 @@ if(BUILD_TESTS)
     ${CMAKE_CURRENT_SOURCE_DIR}/src
   )
 
+  include(Catch)
   include(CTest)
-  include(dependencies/submodules/Catch2/extras/Catch.cmake)
   catch_discover_tests(ida-patcher-tests)
 endif()
