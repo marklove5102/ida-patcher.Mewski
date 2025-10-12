@@ -1,6 +1,6 @@
-#include <catch2/catch_test_macros.hpp>
-
 #include <vector>
+
+#include <catch2/catch_test_macros.hpp>
 
 #include "pattern.hpp"
 
@@ -258,6 +258,7 @@ TEST_CASE("find_pattern - SIMD boundary conditions", "[pattern][matching][find][
       }
       pattern_str += "AA";
     }
+
     auto pattern = parse_pattern(pattern_str);
     auto matches = find_pattern(data.data(), data.size(), pattern);
 
@@ -273,6 +274,7 @@ TEST_CASE("find_pattern - SIMD boundary conditions", "[pattern][matching][find][
       }
       pattern_str += "BB";
     }
+
     auto pattern = parse_pattern(pattern_str);
     auto matches = find_pattern(data.data(), data.size(), pattern);
 
@@ -382,17 +384,9 @@ TEST_CASE("find_pattern - real-world scenarios", "[pattern][matching][find][real
 
   SECTION("JMP instruction with wildcard offset") {
     std::uint8_t data[] = {
-      0xE9,
-      0x12,
-      0x34,
-      0x56,
-      0x78,  // jmp offset
-      0x90,  // nop
-      0xE9,
-      0xAA,
-      0xBB,
-      0xCC,
-      0xDD  // another jmp
+      0xE9, 0x12, 0x34, 0x56, 0x78,  // jmp offset
+      0x90,                          // nop
+      0xE9, 0xAA, 0xBB, 0xCC, 0xDD   // another jmp
     };
 
     auto pattern = parse_pattern("E9 ?? ?? ?? ??");
@@ -405,20 +399,9 @@ TEST_CASE("find_pattern - real-world scenarios", "[pattern][matching][find][real
 
   SECTION("call instruction pattern") {
     std::uint8_t data[] = {
-      0xFF,
-      0x15,
-      0x12,
-      0x34,
-      0x56,
-      0x78,  // call qword ptr [rip+offset]
-      0x90,
-      0x90,  // nops
-      0xFF,
-      0x15,
-      0xAA,
-      0xBB,
-      0xCC,
-      0xDD  // another call
+      0xFF, 0x15, 0x12, 0x34, 0x56, 0x78,  // call qword ptr [rip+offset]
+      0x90, 0x90,                          // nops
+      0xFF, 0x15, 0xAA, 0xBB, 0xCC, 0xDD   // another call
     };
 
     auto pattern = parse_pattern("FF 15 ?? ?? ?? ??");

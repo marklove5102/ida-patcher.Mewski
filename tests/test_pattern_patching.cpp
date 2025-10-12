@@ -1,7 +1,7 @@
-#include <catch2/catch_test_macros.hpp>
-
 #include <stdexcept>
 #include <vector>
+
+#include <catch2/catch_test_macros.hpp>
 
 #include "pattern.hpp"
 
@@ -111,20 +111,14 @@ TEST_CASE("apply_pattern_patch - error handling", "[pattern][patch][error]") {
   SECTION("null data pointer throws") {
     auto pattern = parse_pattern("AA BB");
 
-    REQUIRE_THROWS_AS(
-      apply_pattern_patch(nullptr, 10, pattern),
-      std::invalid_argument
-    );
+    REQUIRE_THROWS_AS(apply_pattern_patch(nullptr, 10, pattern), std::invalid_argument);
   }
 
   SECTION("pattern larger than data throws") {
     std::uint8_t data[] = {0xAA, 0xBB};
     auto pattern = parse_pattern("11 22 33 44");
 
-    REQUIRE_THROWS_AS(
-      apply_pattern_patch(data, sizeof(data), pattern),
-      std::out_of_range
-    );
+    REQUIRE_THROWS_AS(apply_pattern_patch(data, sizeof(data), pattern), std::out_of_range);
   }
 
   SECTION("empty pattern is no-op") {
@@ -142,10 +136,7 @@ TEST_CASE("apply_pattern_patch - error handling", "[pattern][patch][error]") {
     std::uint8_t data[] = {0xAA};
     auto pattern = parse_pattern("BB");
 
-    REQUIRE_THROWS_AS(
-      apply_pattern_patch(data, 0, pattern),
-      std::out_of_range
-    );
+    REQUIRE_THROWS_AS(apply_pattern_patch(data, 0, pattern), std::out_of_range);
   }
 }
 
@@ -198,8 +189,8 @@ TEST_CASE("apply_pattern_patch - edge cases", "[pattern][patch][edge]") {
 TEST_CASE("apply_pattern_patch - real-world scenarios", "[pattern][patch][real-world]") {
   SECTION("NOP out instructions") {
     std::uint8_t data[] = {
-      0x74, 0x05,              // jz short +5
-      0xE8, 0x12, 0x34, 0x56, 0x78  // call offset
+      0x74, 0x05,                    // jz short +5
+      0xE8, 0x12, 0x34, 0x56, 0x78   // call offset
     };
     auto pattern = parse_pattern("90 90 90 90 90 90 90");
 
@@ -311,6 +302,7 @@ TEST_CASE("apply_pattern_patch - nibble-level operations", "[pattern][patch][nib
     // First extract low nibble to temp, then write high nibble to low position
     // This test just verifies nibble-level control
     auto pattern = parse_pattern("BA");
+
     apply_pattern_patch(data, sizeof(data), pattern);
 
     REQUIRE(data[0] == 0xBA);
@@ -339,6 +331,7 @@ TEST_CASE("apply_pattern_patch - large buffers", "[pattern][patch][large]") {
       }
       pattern_str += "BB";
     }
+
     auto pattern = parse_pattern(pattern_str);
 
     apply_pattern_patch(data.data(), data.size(), pattern);
@@ -358,6 +351,7 @@ TEST_CASE("apply_pattern_patch - large buffers", "[pattern][patch][large]") {
     REQUIRE(data[1] == 0xBB);
     REQUIRE(data[2] == 0xCC);
     REQUIRE(data[3] == 0xDD);
+
     for (std::size_t i = 4; i < data.size(); ++i) {
       REQUIRE(data[i] == 0x00);
     }
