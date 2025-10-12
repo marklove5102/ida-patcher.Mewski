@@ -248,8 +248,6 @@ TEST_CASE("find_pattern - edge cases", "[pattern][matching][find][edge]") {
   }
 }
 
-
-
 TEST_CASE("find_pattern - large data sets", "[pattern][matching][find][large]") {
   SECTION("large data with single match") {
     std::vector<std::uint8_t> data(1024, 0x00);
@@ -281,8 +279,6 @@ TEST_CASE("find_pattern - large data sets", "[pattern][matching][find][large]") 
   }
 }
 
-
-
 TEST_CASE("find_pattern - real-world scenarios", "[pattern][matching][find][real-world]") {
   SECTION("x86-64 function prologue") {
     std::uint8_t data[] = {
@@ -302,9 +298,17 @@ TEST_CASE("find_pattern - real-world scenarios", "[pattern][matching][find][real
 
   SECTION("JMP instruction with wildcard offset") {
     std::uint8_t data[] = {
-      0xE9, 0x12, 0x34, 0x56, 0x78,  // jmp offset
-      0x90,                          // nop
-      0xE9, 0xAA, 0xBB, 0xCC, 0xDD   // another jmp
+      0xE9,
+      0x12,
+      0x34,
+      0x56,
+      0x78,  // jmp offset
+      0x90,  // nop
+      0xE9,
+      0xAA,
+      0xBB,
+      0xCC,
+      0xDD  // another jmp
     };
 
     auto pattern = parse_pattern("E9 ?? ?? ?? ??");
@@ -317,9 +321,20 @@ TEST_CASE("find_pattern - real-world scenarios", "[pattern][matching][find][real
 
   SECTION("call instruction pattern") {
     std::uint8_t data[] = {
-      0xFF, 0x15, 0x12, 0x34, 0x56, 0x78,  // call qword ptr [rip+offset]
-      0x90, 0x90,                          // nops
-      0xFF, 0x15, 0xAA, 0xBB, 0xCC, 0xDD   // another call
+      0xFF,
+      0x15,
+      0x12,
+      0x34,
+      0x56,
+      0x78,  // call qword ptr [rip+offset]
+      0x90,
+      0x90,  // nops
+      0xFF,
+      0x15,
+      0xAA,
+      0xBB,
+      0xCC,
+      0xDD  // another call
     };
 
     auto pattern = parse_pattern("FF 15 ?? ?? ?? ??");

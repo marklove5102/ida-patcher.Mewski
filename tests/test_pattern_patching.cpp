@@ -178,8 +178,13 @@ TEST_CASE("apply_pattern_patch - edge cases", "[pattern][patch][edge]") {
 TEST_CASE("apply_pattern_patch - x86 instruction patching", "[pattern][patch][x86]") {
   SECTION("nop out instructions") {
     std::uint8_t data[] = {
-      0x74, 0x05,                    // jz short +5
-      0xE8, 0x12, 0x34, 0x56, 0x78   // call offset
+      0x74,
+      0x05,  // jz short +5
+      0xE8,
+      0x12,
+      0x34,
+      0x56,
+      0x78  // call offset
     };
     auto pattern = parse_pattern("90 90 90 90 90 90 90");
 
@@ -191,7 +196,7 @@ TEST_CASE("apply_pattern_patch - x86 instruction patching", "[pattern][patch][x8
   }
 
   SECTION("patch conditional jump to unconditional") {
-    std::uint8_t data[] = {0x74, 0x05};  // jz short +5
+    std::uint8_t data[] = {0x74, 0x05};     // jz short +5
     auto pattern = parse_pattern("EB ??");  // jmp short (preserve offset)
 
     apply_pattern_patch(data, sizeof(data), pattern);
@@ -220,9 +225,18 @@ TEST_CASE("apply_pattern_patch - x86 instruction patching", "[pattern][patch][x8
 TEST_CASE("apply_pattern_patch - aarch64 instruction patching", "[pattern][patch][aarch64]") {
   SECTION("nop out instructions") {
     std::uint8_t data[] = {
-      0x00, 0x00, 0x80, 0xD2,  // mov x0, #0
-      0x01, 0x00, 0x80, 0xD2,  // mov x1, #0
-      0xC0, 0x03, 0x5F, 0xD6   // ret
+      0x00,
+      0x00,
+      0x80,
+      0xD2,  // mov x0, #0
+      0x01,
+      0x00,
+      0x80,
+      0xD2,  // mov x1, #0
+      0xC0,
+      0x03,
+      0x5F,
+      0xD6  // ret
     };
     auto pattern = parse_pattern("1F 20 03 D5 1F 20 03 D5 1F 20 03 D5");  // nop x3
 
