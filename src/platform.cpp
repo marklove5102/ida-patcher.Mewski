@@ -2,7 +2,6 @@
 
 #include <cstring>
 #include <fstream>
-#include <format>
 #include <mutex>
 #include <stdexcept>
 #include <vector>
@@ -234,13 +233,13 @@ struct patch_t {
 static std::vector<patch_t> parse_config(const std::filesystem::path& path) {
   // Verify config file exists
   if (!std::filesystem::exists(path)) {
-    throw std::runtime_error(std::format("Config file not found: {}", path.string()));
+    throw std::runtime_error("Config file not found: " + path.string());
   }
 
   // Open config file
   std::ifstream file(path);
   if (!file.is_open()) {
-    throw std::runtime_error(std::format("Failed to open config file: {}", path.string()));
+    throw std::runtime_error("Failed to open config file: " + path.string());
   }
 
   // Parse JSON from file
@@ -248,7 +247,7 @@ static std::vector<patch_t> parse_config(const std::filesystem::path& path) {
   try {
     file >> patch_list;
   } catch (const nlohmann::json::exception& e) {
-    throw std::runtime_error(std::format("JSON parse error: {}", e.what()));
+    throw std::runtime_error(std::string("JSON parse error: ") + e.what());
   }
 
   // Convert JSON array to patch structures
