@@ -211,9 +211,8 @@ TEST_CASE("find_pattern - no matches", "[pattern][matching][find][negative]") {
 
 TEST_CASE("find_pattern - edge cases", "[pattern][matching][find][edge]") {
   SECTION("empty data") {
-    std::uint8_t data[] = {};
     auto pattern = parse_pattern("AA");
-    auto matches = find_pattern(data, 0, pattern);
+    auto matches = find_pattern(nullptr, 0, pattern);
 
     REQUIRE(matches.empty());
   }
