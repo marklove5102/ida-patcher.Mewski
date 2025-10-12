@@ -37,6 +37,7 @@ jobs:
         with:
           files: |
             build/Release/ida-patcher.dll
+            examples/template/ida-patcher.json
           generate_release_notes: true
           draft: false
           prerelease: false
