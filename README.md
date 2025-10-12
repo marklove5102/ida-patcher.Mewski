@@ -18,7 +18,7 @@ cmake --build . --config Release
 
 ## Usage
 
-Create `ida-patcher.json` in your IDA Pro `plugins` directory:
+Copy the included `ida-patcher.json` to your IDA Pro `plugins` directory and modify it with your patches:
 
 ```json
 [

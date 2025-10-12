@@ -12,12 +12,12 @@ find_package(idasdk REQUIRED)
 add_subdirectory(dependencies)
 
 add_library(ida-patcher SHARED
-    src/plugin.cpp
-    src/pattern.cpp
-    src/pattern.hpp
+  src/plugin.cpp
+  src/pattern.cpp
+  src/pattern.hpp
 )
 
 target_link_libraries(ida-patcher PRIVATE
-    idasdk::plugin
-    nlohmann_json::nlohmann_json
+  idasdk::plugin
+  nlohmann_json::nlohmann_json
 )

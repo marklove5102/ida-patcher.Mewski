@@ -1,0 +1,9 @@
+[
+  {
+    "name": "example_patch",
+    "enabled": false,
+    "modules": ["ida64.exe"],
+    "search": "DE AD ?? ?? BE EF",
+    "replace": "DE AD ?? ?? C0 DE"
+  }
+]
