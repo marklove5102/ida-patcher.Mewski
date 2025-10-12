@@ -26,6 +26,7 @@
 #include <unistd.h>
 #elif defined(__linux__)
 #include <dlfcn.h>
+#include <elf.h>
 #include <link.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -71,6 +72,57 @@ std::filesystem::path get_config_path(module_handle_t module_handle) {
 module_handle_t get_module_handle(const std::string& module_name) {
 #ifdef _WIN32
   return GetModuleHandleA(module_name.c_str());
+#elif defined(__APPLE__)
+  // On macOS, search through loaded images by name
+  const uint32_t image_count = _dyld_image_count();
+  for (uint32_t i = 0; i < image_count; i++) {
+    const char* image_name = _dyld_get_image_name(i);
+    if (image_name != nullptr) {
+      // Check if the module name matches either the full path or just the filename
+      const std::string full_path(image_name);
+      if (full_path.find(module_name) != std::string::npos ||
+          std::filesystem::path(full_path).filename() == module_name) {
+        const auto* header = _dyld_get_image_header(i);
+        return const_cast<void*>(static_cast<const void*>(header));
+      }
+    }
+  }
+  return nullptr;
+#elif defined(__linux__)
+  // On Linux, try to open with RTLD_NOLOAD first (doesn't increment refcount)
+  void* handle = dlopen(module_name.c_str(), RTLD_NOLOAD | RTLD_NOW);
+  if (handle != nullptr) {
+    return handle;
+  }
+  
+  // If not found by direct name, search through loaded modules
+  // This callback searches for a module by name
+  struct callback_data {
+    std::string target_name;
+    void* result;
+  };
+  
+  callback_data data{module_name, nullptr};
+  
+  dl_iterate_phdr(
+    [](struct dl_phdr_info* info, size_t size, void* data_ptr) -> int {
+      auto* cb_data = static_cast<callback_data*>(data_ptr);
+      if (info->dlpi_name != nullptr && info->dlpi_name[0] != '\0') {
+        std::string full_path(info->dlpi_name);
+        // Check if the module name matches either the full path or just the filename
+        if (full_path.find(cb_data->target_name) != std::string::npos ||
+            std::filesystem::path(full_path).filename() == cb_data->target_name) {
+          // Open the module with RTLD_NOLOAD to get a handle
+          cb_data->result = dlopen(info->dlpi_name, RTLD_NOLOAD | RTLD_NOW);
+          return 1;  // Stop iteration
+        }
+      }
+      return 0;  // Continue iteration
+    },
+    &data
+  );
+  
+  return data.result;
 #else
   return dlopen(module_name.c_str(), RTLD_NOLOAD | RTLD_NOW);
 #endif
@@ -98,28 +150,55 @@ bool get_module_info(module_handle_t module_handle, void** base_address, size_t*
   *size = module_info.SizeOfImage;
   return true;
 #elif defined(__APPLE__)
-  // On macOS, iterate through loaded images to find our module
-  for (uint32_t i = 0; i < _dyld_image_count(); i++) {
-    if (reinterpret_cast<void*>(
-          const_cast<mach_header*>(reinterpret_cast<const mach_header*>(_dyld_get_image_header(i)))
-        ) == module_handle) {
-      *base_address = const_cast<void*>(reinterpret_cast<const void*>(_dyld_get_image_header(i)));
-      // For macOS, we need to calculate size from segments
-      // For simplicity, we'll use a large value and rely on proper bounds checking
-      *size = 0x10000000;  // 256MB max, should be sufficient for IDA modules
-      return true;
+  // On macOS, module_handle is the mach_header pointer
+  const mach_header_64* header = reinterpret_cast<const mach_header_64*>(module_handle);
+  *base_address = module_handle;
+  
+  // Calculate total size by iterating through load commands
+  size_t total_size = 0;
+  const uint8_t* cmd_ptr = reinterpret_cast<const uint8_t*>(header) + sizeof(mach_header_64);
+  
+  for (uint32_t i = 0; i < header->ncmds; i++) {
+    const auto* cmd = reinterpret_cast<const load_command*>(cmd_ptr);
+    
+    if (cmd->cmd == LC_SEGMENT_64) {
+      const auto* seg = reinterpret_cast<const segment_command_64*>(cmd);
+      // Calculate the end of this segment
+      size_t seg_end = seg->vmaddr + seg->vmsize;
+      if (seg_end > total_size) {
+        total_size = seg_end;
+      }
     }
+    
+    cmd_ptr += cmd->cmdsize;
   }
-  return false;
+  
+  *size = total_size;
+  return true;
 #elif defined(__linux__)
-  struct link_map* map = static_cast<struct link_map*>(module_handle);
+  auto* map = static_cast<link_map*>(module_handle);
   if (map == nullptr) {
     return false;
   }
+  
+  // Get base address from link_map
   *base_address = reinterpret_cast<void*>(map->l_addr);
-  // On Linux, calculate size from program headers
-  // For simplicity, use a large value
-  *size = 0x10000000;  // 256MB max
+  
+  // Parse ELF header to calculate actual module size
+  const auto* ehdr = reinterpret_cast<const ElfW(Ehdr)*>(map->l_addr);
+  const auto* phdr = reinterpret_cast<const ElfW(Phdr)*>(map->l_addr + ehdr->e_phoff);
+  
+  size_t max_addr = 0;
+  for (ElfW(Half) i = 0; i < ehdr->e_phnum; i++) {
+    if (phdr[i].p_type == PT_LOAD) {
+      const size_t seg_end = phdr[i].p_vaddr + phdr[i].p_memsz;
+      if (seg_end > max_addr) {
+        max_addr = seg_end;
+      }
+    }
+  }
+  
+  *size = max_addr;
   return true;
 #endif
 }
@@ -165,16 +244,14 @@ bool write_process_memory(void* address, const void* data, size_t size) {
   return true;
 #elif defined(__linux__)
   // Get page size and align address
-  long page_size = sysconf(_SC_PAGESIZE);
-  void* page_start =
-    reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(address) & ~(page_size - 1));
+  const long page_size = sysconf(_SC_PAGESIZE);
+  const auto addr_int = reinterpret_cast<uintptr_t>(address);
+  auto* page_start = reinterpret_cast<void*>(addr_int & ~static_cast<uintptr_t>(page_size - 1));
+  const auto page_start_int = reinterpret_cast<uintptr_t>(page_start);
+  const size_t protection_size = size + (addr_int - page_start_int);
 
   // Change memory protection
-  if (mprotect(
-        page_start,
-        size + (reinterpret_cast<uintptr_t>(address) - reinterpret_cast<uintptr_t>(page_start)),
-        PROT_READ | PROT_WRITE | PROT_EXEC
-      ) != 0) {
+  if (mprotect(page_start, protection_size, PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {
     return false;
   }
 
