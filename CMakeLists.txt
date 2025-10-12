@@ -9,7 +9,7 @@ set(ENV{IDASDK} ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/submodules/ida-sdk/src)
 include(dependencies/submodules/ida-cmake/bootstrap.cmake)
 find_package(idasdk REQUIRED)
 
-add_subdirectory(dependencies)
+add_subdirectory(dependencies/submodules/json)
 
 add_library(ida-patcher SHARED
   src/plugin.cpp
@@ -25,6 +25,8 @@ target_link_libraries(ida-patcher PRIVATE
 option(BUILD_TESTS "Build tests" ON)
 
 if(BUILD_TESTS)
+  add_subdirectory(dependencies/submodules/Catch2)
+
   enable_testing()
 
   add_executable(ida-patcher-tests
