@@ -21,3 +21,28 @@ target_link_libraries(ida-patcher PRIVATE
   idasdk::plugin
   nlohmann_json::nlohmann_json
 )
+
+option(BUILD_TESTS "Build tests" ON)
+
+if(BUILD_TESTS)
+  enable_testing()
+
+  add_executable(ida-patcher-tests
+    tests/test_pattern_parsing.cpp
+    tests/test_pattern_matching.cpp
+    tests/test_pattern_patching.cpp
+    src/pattern.cpp
+  )
+
+  target_link_libraries(ida-patcher-tests PRIVATE
+    Catch2::Catch2WithMain
+  )
+
+  target_include_directories(ida-patcher-tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+  )
+
+  include(CTest)
+  include(Catch)
+  catch_discover_tests(ida-patcher-tests)
+endif()
