@@ -255,9 +255,9 @@ TEST_CASE("parse_pattern - edge cases", "[pattern][parsing][edge]") {
     REQUIRE(result[3].nibble[1].data == 0xB);
   }
 
-  SECTION("64 byte pattern (AVX-512 boundary)") {
+  SECTION("large pattern") {
     std::string pattern;
-    for (int i = 0; i < 64; ++i) {
+    for (int i = 0; i < 100; ++i) {
       if (i > 0) {
         pattern += " ";
       }
@@ -266,20 +266,6 @@ TEST_CASE("parse_pattern - edge cases", "[pattern][parsing][edge]") {
 
     auto result = parse_pattern(pattern);
 
-    REQUIRE(result.size() == 64);
-  }
-
-  SECTION("65 byte pattern (exceeds AVX-512 register)") {
-    std::string pattern;
-    for (int i = 0; i < 65; ++i) {
-      if (i > 0) {
-        pattern += " ";
-      }
-      pattern += "BB";
-    }
-
-    auto result = parse_pattern(pattern);
-
-    REQUIRE(result.size() == 65);
+    REQUIRE(result.size() == 100);
   }
 }

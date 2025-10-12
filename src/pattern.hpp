@@ -46,9 +46,8 @@ bool match_pattern_byte(std::uint8_t byte, const pattern_byte_t& pattern_byte);
 /**
  * @brief Searches for all occurrences of a pattern in a data buffer
  *
- * Uses AVX-512 SIMD acceleration when available and pattern is suitable (≤64 bytes,
- * no mixed wildcards like "?F" or "A?"). Falls back to scalar byte-by-byte matching
- * for complex patterns or when SIMD is unavailable.
+ * Uses scalar byte-by-byte matching with early exit on mismatch for optimal
+ * cross-platform compatibility.
  *
  * @param data Pointer to the data buffer to search
  * @param data_size Size of the data buffer in bytes

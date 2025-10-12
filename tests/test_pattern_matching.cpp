@@ -7,7 +7,7 @@
 /**
  * @brief Tests for pattern matching functions
  *
- * Validates both AVX-512 SIMD and scalar pattern matching implementations.
+ * Validates scalar pattern matching implementation.
  * Tests cover: byte matching, pattern finding, edge cases, and performance scenarios.
  */
 
@@ -35,7 +35,7 @@ TEST_CASE("match_pattern_byte - exact matches", "[pattern][matching][byte]") {
     REQUIRE(match_pattern_byte(0x01, pattern) == false);
   }
 
-  SECTION("all Fs") {
+  SECTION("all ones") {
     pattern_byte_t pattern = {};
     pattern.nibble[0].data = 0xF;
     pattern.nibble[0].wildcard = false;
@@ -248,56 +248,10 @@ TEST_CASE("find_pattern - edge cases", "[pattern][matching][find][edge]") {
   }
 }
 
-TEST_CASE("find_pattern - SIMD boundary conditions", "[pattern][matching][find][simd]") {
-  SECTION("exactly 64 bytes pattern (AVX-512 register size)") {
-    std::vector<std::uint8_t> data(128, 0xAA);
-    std::string pattern_str;
-    for (int i = 0; i < 64; ++i) {
-      if (i > 0) {
-        pattern_str += " ";
-      }
-      pattern_str += "AA";
-    }
 
-    auto pattern = parse_pattern(pattern_str);
-    auto matches = find_pattern(data.data(), data.size(), pattern);
-
-    REQUIRE(matches.size() == 65);
-  }
-
-  SECTION("65 bytes pattern (exceeds AVX-512 register)") {
-    std::vector<std::uint8_t> data(128, 0xBB);
-    std::string pattern_str;
-    for (int i = 0; i < 65; ++i) {
-      if (i > 0) {
-        pattern_str += " ";
-      }
-      pattern_str += "BB";
-    }
-
-    auto pattern = parse_pattern(pattern_str);
-    auto matches = find_pattern(data.data(), data.size(), pattern);
-
-    REQUIRE(matches.size() == 64);
-  }
-
-  SECTION("pattern at 64-byte boundary") {
-    std::vector<std::uint8_t> data(128, 0x00);
-    data[63] = 0xDE;
-    data[64] = 0xAD;
-    data[65] = 0xBE;
-    data[66] = 0xEF;
-
-    auto pattern = parse_pattern("DE AD BE EF");
-    auto matches = find_pattern(data.data(), data.size(), pattern);
-
-    REQUIRE(matches.size() == 1);
-    REQUIRE(matches[0] == 63);
-  }
-}
 
 TEST_CASE("find_pattern - large data sets", "[pattern][matching][find][large]") {
-  SECTION("1KB data with single match") {
+  SECTION("large data with single match") {
     std::vector<std::uint8_t> data(1024, 0x00);
     data[512] = 0xDE;
     data[513] = 0xAD;
@@ -311,59 +265,23 @@ TEST_CASE("find_pattern - large data sets", "[pattern][matching][find][large]") 
     REQUIRE(matches[0] == 512);
   }
 
-  SECTION("4KB data with multiple matches") {
-    std::vector<std::uint8_t> data(4096, 0x00);
+  SECTION("large data with multiple matches") {
+    std::vector<std::uint8_t> data(2048, 0x00);
     data[100] = 0xAA;
+    data[500] = 0xAA;
     data[1000] = 0xAA;
-    data[2000] = 0xAA;
-    data[3000] = 0xAA;
 
     auto pattern = parse_pattern("AA");
     auto matches = find_pattern(data.data(), data.size(), pattern);
 
-    REQUIRE(matches.size() == 4);
+    REQUIRE(matches.size() == 3);
     REQUIRE(matches[0] == 100);
-    REQUIRE(matches[1] == 1000);
-    REQUIRE(matches[2] == 2000);
-    REQUIRE(matches[3] == 3000);
+    REQUIRE(matches[1] == 500);
+    REQUIRE(matches[2] == 1000);
   }
 }
 
-TEST_CASE("find_pattern - SIMD vs scalar consistency", "[pattern][matching][find][simd][scalar]") {
-  SECTION("SIMD-compatible pattern (full-byte wildcards)") {
-    std::vector<std::uint8_t> data(256, 0x00);
-    data[10] = 0x48;
-    data[11] = 0x8B;
-    data[12] = 0xAA;
-    data[13] = 0xBB;
-    data[100] = 0x48;
-    data[101] = 0x8B;
-    data[102] = 0xCC;
-    data[103] = 0xDD;
 
-    auto pattern = parse_pattern("48 8B ?? ??");
-    auto matches = find_pattern(data.data(), data.size(), pattern);
-
-    REQUIRE(matches.size() == 2);
-    REQUIRE(matches[0] == 10);
-    REQUIRE(matches[1] == 100);
-  }
-
-  SECTION("non-SIMD pattern (mixed wildcards)") {
-    std::vector<std::uint8_t> data(256, 0x00);
-    data[10] = 0xA5;
-    data[11] = 0xBB;
-    data[100] = 0xC5;
-    data[101] = 0xBB;
-
-    auto pattern = parse_pattern("?5 BB");
-    auto matches = find_pattern(data.data(), data.size(), pattern);
-
-    REQUIRE(matches.size() == 2);
-    REQUIRE(matches[0] == 10);
-    REQUIRE(matches[1] == 100);
-  }
-}
 
 TEST_CASE("find_pattern - real-world scenarios", "[pattern][matching][find][real-world]") {
   SECTION("x86-64 function prologue") {

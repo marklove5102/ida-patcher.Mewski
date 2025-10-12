@@ -141,18 +141,7 @@ TEST_CASE("apply_pattern_patch - error handling", "[pattern][patch][error]") {
 }
 
 TEST_CASE("apply_pattern_patch - edge cases", "[pattern][patch][edge]") {
-  SECTION("single byte at start") {
-    std::uint8_t data[] = {0xAA, 0xBB, 0xCC};
-    auto pattern = parse_pattern("FF");
-
-    apply_pattern_patch(data, sizeof(data), pattern);
-
-    REQUIRE(data[0] == 0xFF);
-    REQUIRE(data[1] == 0xBB);
-    REQUIRE(data[2] == 0xCC);
-  }
-
-  SECTION("all zeros to all Fs") {
+  SECTION("replace all zeros with all ones") {
     std::uint8_t data[] = {0x00, 0x00, 0x00};
     auto pattern = parse_pattern("FF FF FF");
 
@@ -163,7 +152,7 @@ TEST_CASE("apply_pattern_patch - edge cases", "[pattern][patch][edge]") {
     REQUIRE(data[2] == 0xFF);
   }
 
-  SECTION("all Fs to all zeros") {
+  SECTION("replace all ones with all zeros") {
     std::uint8_t data[] = {0xFF, 0xFF, 0xFF};
     auto pattern = parse_pattern("00 00 00");
 
@@ -174,7 +163,7 @@ TEST_CASE("apply_pattern_patch - edge cases", "[pattern][patch][edge]") {
     REQUIRE(data[2] == 0x00);
   }
 
-  SECTION("pattern equals data size") {
+  SECTION("pattern size matches buffer size") {
     std::uint8_t data[] = {0xAA, 0xBB, 0xCC};
     auto pattern = parse_pattern("11 22 33");
 
@@ -186,8 +175,8 @@ TEST_CASE("apply_pattern_patch - edge cases", "[pattern][patch][edge]") {
   }
 }
 
-TEST_CASE("apply_pattern_patch - real-world scenarios", "[pattern][patch][real-world]") {
-  SECTION("NOP out instructions") {
+TEST_CASE("apply_pattern_patch - x86 instruction patching", "[pattern][patch][x86]") {
+  SECTION("nop out instructions") {
     std::uint8_t data[] = {
       0x74, 0x05,                    // jz short +5
       0xE8, 0x12, 0x34, 0x56, 0x78   // call offset
@@ -211,28 +200,11 @@ TEST_CASE("apply_pattern_patch - real-world scenarios", "[pattern][patch][real-w
     REQUIRE(data[1] == 0x05);
   }
 
-  SECTION("patch return value") {
-    std::uint8_t data[] = {
-      0xB8, 0x00, 0x00, 0x00, 0x00,  // mov eax, 0
-      0xC3                           // ret
-    };
-    auto pattern = parse_pattern("B8 01 00 00 00");  // mov eax, 1
-
-    apply_pattern_patch(data, sizeof(data), pattern);
-
-    REQUIRE(data[0] == 0xB8);
-    REQUIRE(data[1] == 0x01);
-    REQUIRE(data[2] == 0x00);
-    REQUIRE(data[3] == 0x00);
-    REQUIRE(data[4] == 0x00);
-    REQUIRE(data[5] == 0xC3);
-  }
-
-  SECTION("preserve call target while changing instruction") {
+  SECTION("preserve offset with wildcard") {
     std::uint8_t data[] = {
       0xFF, 0x15, 0x12, 0x34, 0x56, 0x78  // call qword ptr [rip+offset]
     };
-    auto pattern = parse_pattern("90 90 ?? ?? ?? ??");  // NOP first 2 bytes, preserve offset
+    auto pattern = parse_pattern("90 90 ?? ?? ?? ??");  // nop first 2 bytes, preserve offset
 
     apply_pattern_patch(data, sizeof(data), pattern);
 
@@ -245,31 +217,65 @@ TEST_CASE("apply_pattern_patch - real-world scenarios", "[pattern][patch][real-w
   }
 }
 
-TEST_CASE("apply_pattern_patch - DEADBEEF example", "[pattern][patch][example]") {
-  SECTION("DEADBEEF to DEADCODE") {
-    std::uint8_t data[] = {0xDE, 0xAD, 0xBE, 0xEF};
-    auto pattern = parse_pattern("DE AD C0 DE");
+TEST_CASE("apply_pattern_patch - aarch64 instruction patching", "[pattern][patch][aarch64]") {
+  SECTION("nop out instructions") {
+    std::uint8_t data[] = {
+      0x00, 0x00, 0x80, 0xD2,  // mov x0, #0
+      0x01, 0x00, 0x80, 0xD2,  // mov x1, #0
+      0xC0, 0x03, 0x5F, 0xD6   // ret
+    };
+    auto pattern = parse_pattern("1F 20 03 D5 1F 20 03 D5 1F 20 03 D5");  // nop x3
 
     apply_pattern_patch(data, sizeof(data), pattern);
 
-    REQUIRE(data[0] == 0xDE);
-    REQUIRE(data[1] == 0xAD);
-    REQUIRE(data[2] == 0xC0);
-    REQUIRE(data[3] == 0xDE);
+    for (std::size_t i = 0; i < sizeof(data); i += 4) {
+      REQUIRE(data[i] == 0x1F);
+      REQUIRE(data[i + 1] == 0x20);
+      REQUIRE(data[i + 2] == 0x03);
+      REQUIRE(data[i + 3] == 0xD5);
+    }
   }
 
-  SECTION("DEADBEEF with wildcard preservation") {
-    std::uint8_t data[] = {0xDE, 0xAD, 0xBE, 0xEF, 0x12, 0x34};
-    auto pattern = parse_pattern("DE AD ?? ?? C0 DE");
+  SECTION("patch branch to nop preserving target") {
+    std::uint8_t data[] = {
+      0x03, 0x00, 0x00, 0x54  // b.eq <target>
+    };
+    auto pattern = parse_pattern("1F 20 03 D5");  // nop
 
     apply_pattern_patch(data, sizeof(data), pattern);
 
-    REQUIRE(data[0] == 0xDE);
-    REQUIRE(data[1] == 0xAD);
-    REQUIRE(data[2] == 0xBE);
-    REQUIRE(data[3] == 0xEF);
-    REQUIRE(data[4] == 0xC0);
-    REQUIRE(data[5] == 0xDE);
+    REQUIRE(data[0] == 0x1F);
+    REQUIRE(data[1] == 0x20);
+    REQUIRE(data[2] == 0x03);
+    REQUIRE(data[3] == 0xD5);
+  }
+
+  SECTION("preserve immediate value with wildcard") {
+    std::uint8_t data[] = {
+      0x00, 0x12, 0x80, 0xD2  // mov x0, #0x900
+    };
+    auto pattern = parse_pattern("00 ?? ?? D2");  // preserve immediate, keep instruction type
+
+    apply_pattern_patch(data, sizeof(data), pattern);
+
+    REQUIRE(data[0] == 0x00);
+    REQUIRE(data[1] == 0x12);
+    REQUIRE(data[2] == 0x80);
+    REQUIRE(data[3] == 0xD2);
+  }
+
+  SECTION("modify register while preserving immediate") {
+    std::uint8_t data[] = {
+      0x00, 0x12, 0x80, 0xD2  // mov x0, #0x900
+    };
+    auto pattern = parse_pattern("01 ?? ?? ??");  // change x0 to x1, preserve rest
+
+    apply_pattern_patch(data, sizeof(data), pattern);
+
+    REQUIRE(data[0] == 0x01);
+    REQUIRE(data[1] == 0x12);
+    REQUIRE(data[2] == 0x80);
+    REQUIRE(data[3] == 0xD2);
   }
 }
 
@@ -296,18 +302,6 @@ TEST_CASE("apply_pattern_patch - nibble-level operations", "[pattern][patch][nib
     REQUIRE(data[2] == 0xE3);
   }
 
-  SECTION("swap nibbles conceptually") {
-    std::uint8_t data[] = {0xAB};
-
-    // First extract low nibble to temp, then write high nibble to low position
-    // This test just verifies nibble-level control
-    auto pattern = parse_pattern("BA");
-
-    apply_pattern_patch(data, sizeof(data), pattern);
-
-    REQUIRE(data[0] == 0xBA);
-  }
-
   SECTION("complex nibble pattern") {
     std::uint8_t data[] = {0x12, 0x34, 0x56, 0x78};
     auto pattern = parse_pattern("?0 A? ?F F?");
@@ -322,10 +316,10 @@ TEST_CASE("apply_pattern_patch - nibble-level operations", "[pattern][patch][nib
 }
 
 TEST_CASE("apply_pattern_patch - large buffers", "[pattern][patch][large]") {
-  SECTION("64 byte pattern (AVX-512 boundary)") {
-    std::vector<std::uint8_t> data(64, 0xAA);
+  SECTION("large pattern replacement") {
+    std::vector<std::uint8_t> data(100, 0xAA);
     std::string pattern_str;
-    for (int i = 0; i < 64; ++i) {
+    for (int i = 0; i < 50; ++i) {
       if (i > 0) {
         pattern_str += " ";
       }
@@ -333,27 +327,14 @@ TEST_CASE("apply_pattern_patch - large buffers", "[pattern][patch][large]") {
     }
 
     auto pattern = parse_pattern(pattern_str);
-
     apply_pattern_patch(data.data(), data.size(), pattern);
 
-    for (std::size_t i = 0; i < data.size(); ++i) {
+    for (std::size_t i = 0; i < 50; ++i) {
       REQUIRE(data[i] == 0xBB);
     }
-  }
 
-  SECTION("partial patch of large buffer") {
-    std::vector<std::uint8_t> data(1024, 0x00);
-    auto pattern = parse_pattern("AA BB CC DD");
-
-    apply_pattern_patch(data.data(), data.size(), pattern);
-
-    REQUIRE(data[0] == 0xAA);
-    REQUIRE(data[1] == 0xBB);
-    REQUIRE(data[2] == 0xCC);
-    REQUIRE(data[3] == 0xDD);
-
-    for (std::size_t i = 4; i < data.size(); ++i) {
-      REQUIRE(data[i] == 0x00);
+    for (std::size_t i = 50; i < data.size(); ++i) {
+      REQUIRE(data[i] == 0xAA);
     }
   }
 }
