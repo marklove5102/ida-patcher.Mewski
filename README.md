@@ -55,11 +55,16 @@ Edit `ida-patcher.json` in your IDA Pro `plugins` directory:
   {
     "name": "example_patch",
     "enabled": false,
-    "modules": ["ida.dll", "libida.so", "libida.dylib"],
+    "modules": [
+      "ida.dll",
+      "libida.so",
+      "libida.dylib"
+    ],
     "search": "DE AD ?? ?? BE EF",
     "replace": "DE AD ?? ?? C0 DE"
   }
 ]
+
 ```
 
 Patches apply automatically when IDA Pro starts. Check the output window for status messages.
