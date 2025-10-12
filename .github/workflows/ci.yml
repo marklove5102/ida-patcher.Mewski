@@ -8,28 +8,61 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: ida-patcher.so
+            artifact_path: build/libida-patcher.so
+          - os: windows-latest
+            artifact_name: ida-patcher.dll
+            artifact_path: build/Release/ida-patcher.dll
+          - os: macos-latest
+            artifact_name: ida-patcher.dylib
+            artifact_path: build/libida-patcher.dylib
+    
+    runs-on: ${{ matrix.os }}
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Setup MSBuild
+      - name: Setup MSBuild (Windows)
+        if: runner.os == 'Windows'
         uses: microsoft/setup-msbuild@v2
 
-      - name: Configure CMake
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
         run: |
           cmake -B build -G "Visual Studio 17 2022" -A x64
 
-      - name: Build
+      - name: Configure CMake (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
         run: cmake --build build --config Release
 
-      - name: Test
+      - name: Build (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: cmake --build build
+
+      - name: Test (Windows)
+        if: runner.os == 'Windows'
         run: ctest --test-dir build --output-on-failure --build-config Release
+
+      - name: Test (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: ctest --test-dir build --output-on-failure
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ida-patcher
-          path: build/Release/ida-patcher.dll
+          name: ida-patcher-${{ matrix.os }}
+          path: ${{ matrix.artifact_path }}
