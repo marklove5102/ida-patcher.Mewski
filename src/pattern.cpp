@@ -1,7 +1,7 @@
 #include "pattern.hpp"
 
-#include <stdexcept>
 #include <cstring>
+#include <stdexcept>
 
 /**
  * @brief Parses a hexadecimal pattern string into structured pattern bytes
@@ -91,7 +91,7 @@ bool match_pattern_byte(std::uint8_t byte, const pattern_byte_t& pattern_byte) {
  * @param data Pointer to the data buffer to search
  * @param data_size Size of the data buffer in bytes
  * @param pattern The parsed pattern to search for
- * @return Vector of byte offsets where pattern was found
+ * @return Vector of byte offsets where the pattern was found (may be empty)
  */
 std::vector<std::size_t> find_pattern(
   const std::uint8_t* data, std::size_t data_size, const std::vector<pattern_byte_t>& pattern
