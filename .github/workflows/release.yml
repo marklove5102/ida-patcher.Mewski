@@ -9,35 +9,84 @@ permissions:
   contents: write
 
 jobs:
-  build-and-release:
-    runs-on: windows-latest
-
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: ida-patcher.so
+            artifact_path: build/ida-patcher.so
+          - os: windows-latest
+            artifact_name: ida-patcher.dll
+            artifact_path: build/Release/ida-patcher.dll
+          - os: macos-latest
+            artifact_name: ida-patcher.dylib
+            artifact_path: build/ida-patcher.dylib
+    
+    runs-on: ${{ matrix.os }}
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Setup MSBuild
+      - name: Setup MSBuild (Windows)
+        if: runner.os == 'Windows'
         uses: microsoft/setup-msbuild@v2
 
-      - name: Configure CMake
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
         run: cmake -B build -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTS=OFF
 
-      - name: Build
+      - name: Configure CMake (macOS)
+        if: runner.os == 'macOS'
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
+
+      - name: Configure CMake (Linux)
+        if: runner.os == 'Linux'
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
         run: cmake --build build --config Release
 
-      - name: Create release archive
+      - name: Build (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: cmake --build build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ida-patcher-${{ matrix.os }}
+          path: ${{ matrix.artifact_path }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
         run: |
-          mkdir release
-          copy build\Release\ida-patcher.dll release\
+          mkdir -p release
+          cp artifacts/ida-patcher-ubuntu-latest/ida-patcher.so release/
+          cp artifacts/ida-patcher-windows-latest/ida-patcher.dll release/
+          cp artifacts/ida-patcher-macos-latest/ida-patcher.dylib release/
+          cp examples/template/ida-patcher.json release/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            build/Release/ida-patcher.dll
-            examples/template/ida-patcher.json
+          files: release/*
           generate_release_notes: true
           draft: false
           prerelease: false

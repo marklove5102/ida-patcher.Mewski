@@ -15,13 +15,13 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact_name: ida-patcher.so
-            artifact_path: build/libida-patcher.so
+            artifact_path: build/ida-patcher.so
           - os: windows-latest
             artifact_name: ida-patcher.dll
             artifact_path: build/Release/ida-patcher.dll
           - os: macos-latest
             artifact_name: ida-patcher.dylib
-            artifact_path: build/libida-patcher.dylib
+            artifact_path: build/ida-patcher.dylib
     
     runs-on: ${{ matrix.os }}
     
@@ -40,8 +40,13 @@ jobs:
         run: |
           cmake -B build -G "Visual Studio 17 2022" -A x64
 
-      - name: Configure CMake (Linux/macOS)
-        if: runner.os != 'Windows'
+      - name: Configure CMake (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
+
+      - name: Configure CMake (Linux)
+        if: runner.os == 'Linux'
         run: |
           cmake -B build -DCMAKE_BUILD_TYPE=Release
 

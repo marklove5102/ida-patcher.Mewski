@@ -19,6 +19,8 @@ add_library(ida-patcher SHARED
   src/platform.hpp
 )
 
+set_target_properties(ida-patcher PROPERTIES PREFIX "")
+
 target_link_libraries(ida-patcher PRIVATE
   idasdk::plugin
   nlohmann_json::nlohmann_json
