@@ -43,6 +43,6 @@ if(BUILD_TESTS)
   )
 
   include(CTest)
-  include(Catch)
+  include(dependencies/submodules/Catch2/extras/Catch.cmake)
   catch_discover_tests(ida-patcher-tests)
 endif()
