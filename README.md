@@ -18,7 +18,7 @@ cmake --build . --config Release
 
 ## Usage
 
-Copy the included `ida-patcher.json` to your IDA Pro `plugins` directory and modify it with your patches:
+Create `ida-patcher.json` in your IDA Pro `plugins` directory:
 
 ```json
 [
@@ -46,8 +46,8 @@ Check [`examples/`](examples/) for patch configuration examples.
 
 ## References
 
-- [mrexodia/idapatch](https://github.com/mrexodia/idapatch)
+[mrexodia/idapatch](https://github.com/mrexodia/idapatch)
 
 ## License
 
-MIT - see [LICENSE](LICENSE)
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
