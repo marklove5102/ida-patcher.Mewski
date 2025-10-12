@@ -12,17 +12,25 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
         include:
           - os: ubuntu-latest
             artifact_name: ida-patcher.so
             artifact_path: build/ida-patcher.so
+            platform: linux-x64
           - os: windows-latest
             artifact_name: ida-patcher.dll
             artifact_path: build/Release/ida-patcher.dll
+            platform: win-x64
+          - os: macos-13
+            artifact_name: ida-patcher.dylib
+            artifact_path: build/ida-patcher.dylib
+            platform: macos-x64
+            cmake_arch: x86_64
           - os: macos-latest
             artifact_name: ida-patcher.dylib
             artifact_path: build/ida-patcher.dylib
+            platform: macos-arm64
+            cmake_arch: arm64
     
     runs-on: ${{ matrix.os }}
     
@@ -42,7 +50,7 @@ jobs:
 
       - name: Configure CMake (macOS)
         if: runner.os == 'macOS'
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DCMAKE_OSX_ARCHITECTURES=${{ matrix.cmake_arch }}
 
       - name: Configure CMake (Linux)
         if: runner.os == 'Linux'
@@ -56,37 +64,49 @@ jobs:
         if: runner.os != 'Windows'
         run: cmake --build build
 
+      - name: Create package
+        shell: bash
+        run: |
+          mkdir -p package
+          cp ${{ matrix.artifact_path }} package/${{ matrix.artifact_name }}
+          cp examples/template/ida-patcher.json package/
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ida-patcher-${{ matrix.os }}
-          path: ${{ matrix.artifact_path }}
+          name: ida-patcher-${{ matrix.platform }}
+          path: package/*
 
   release:
     needs: build
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Prepare release files
+      - name: Create release archives
         run: |
-          mkdir -p release
-          cp artifacts/ida-patcher-ubuntu-latest/ida-patcher.so release/
-          cp artifacts/ida-patcher-windows-latest/ida-patcher.dll release/
-          cp artifacts/ida-patcher-macos-latest/ida-patcher.dylib release/
-          cp examples/template/ida-patcher.json release/
+          cd artifacts/ida-patcher-linux-x64
+          zip -r ../../ida-patcher-linux-x64.zip *
+          cd ../ida-patcher-win-x64
+          zip -r ../../ida-patcher-win-x64.zip *
+          cd ../ida-patcher-macos-x64
+          zip -r ../../ida-patcher-macos-x64.zip *
+          cd ../ida-patcher-macos-arm64
+          zip -r ../../ida-patcher-macos-arm64.zip *
+          cd ../..
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release/*
+          files: |
+            ida-patcher-linux-x64.zip
+            ida-patcher-win-x64.zip
+            ida-patcher-macos-x64.zip
+            ida-patcher-macos-arm64.zip
           generate_release_notes: true
           draft: false
           prerelease: false
