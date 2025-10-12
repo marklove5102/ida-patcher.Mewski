@@ -39,8 +39,10 @@ if(BUILD_TESTS)
   )
 
   target_include_directories(ida-patcher-tests PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    src
   )
+
+  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/dependencies/submodules/Catch2/extras")
 
   include(Catch)
   include(CTest)
