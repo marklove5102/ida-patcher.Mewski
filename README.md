@@ -4,16 +4,27 @@ Binary patcher for IDA Pro 9.2+ that applies hotfixes in memory.
 
 ## Installation
 
-Download the latest release from [releases](https://github.com/Mewski/ida-patcher/releases) and copy `ida-patcher.dll` to your IDA `plugins` directory.
+Download the latest release from [releases](https://github.com/Mewski/ida-patcher/releases) and copy the plugin to your IDA `plugins` directory:
+- **Windows**: `ida-patcher.dll`
+- **Linux**: `libida-patcher.so`
+- **macOS**: `libida-patcher.dylib`
 
 Or build from source:
 
+**Windows:**
 ```bash
 git clone --recursive https://github.com/Mewski/ida-patcher.git
 cd ida-patcher
-mkdir build && cd build
-cmake -G "Visual Studio 17 2022" -A x64 ..
-cmake --build . --config Release
+cmake -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
+```
+
+**Linux/macOS:**
+```bash
+git clone --recursive https://github.com/Mewski/ida-patcher.git
+cd ida-patcher
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
 ```
 
 ## Usage
@@ -25,7 +36,7 @@ Create `ida-patcher.json` in your IDA Pro `plugins` directory:
   {
     "name": "example_patch",
     "enabled": false,
-    "modules": ["ida64.exe"],
+    "modules": ["ida.dll", "libida.so", "libida.dylib"],
     "search": "DE AD ?? ?? BE EF",
     "replace": "DE AD ?? ?? C0 DE"
   }
