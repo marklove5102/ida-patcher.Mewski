@@ -152,7 +152,7 @@ bool get_module_info(module_handle_t module_handle, void** base_address, size_t*
   return true;
 #elif defined(__APPLE__)
   // On macOS, module_handle is the mach_header pointer
-  const mach_header_64* header = reinterpret_cast<const mach_header_64*>(module_handle);
+  const auto* header = reinterpret_cast<const mach_header_64*>(module_handle);
   *base_address = module_handle;
 
   // Calculate total size by iterating through load commands
@@ -219,7 +219,7 @@ bool write_process_memory(void* address, const void* data, size_t size) {
   return WriteProcessMemory(GetCurrentProcess(), address, data, size, nullptr) != 0;
 #elif defined(__APPLE__)
   // Page align the address and size
-  const mach_vm_address_t addr = reinterpret_cast<mach_vm_address_t>(address);
+  const auto addr = reinterpret_cast<mach_vm_address_t>(address);
   const mach_vm_address_t page_start = addr & ~(vm_page_size - 1);
   const size_t offset = addr - page_start;
   const mach_vm_size_t page_size = offset + size;
