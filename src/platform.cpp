@@ -22,6 +22,7 @@
 #include <mach/mach.h>
 #include <mach/mach_vm.h>
 #include <dlfcn.h>
+#include <libkern/OSCacheControl.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #elif defined(__linux__)
@@ -217,29 +218,39 @@ bool write_process_memory(void* address, const void* data, size_t size) {
 #ifdef _WIN32
   return WriteProcessMemory(GetCurrentProcess(), address, data, size, nullptr) != 0;
 #elif defined(__APPLE__)
-  // Change memory protection to allow writing
+  // Page align the address and size
+  const mach_vm_address_t addr = reinterpret_cast<mach_vm_address_t>(address);
+  const mach_vm_address_t page_start = addr & ~(vm_page_size - 1);
+  const size_t offset = addr - page_start;
+  const mach_vm_size_t page_size = offset + size;
+  
+  // Change protection to allow writing
   kern_return_t kr = mach_vm_protect(
     mach_task_self(),
-    reinterpret_cast<mach_vm_address_t>(address),
-    size,
+    page_start,
+    page_size,
     FALSE,
     VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY
   );
+  
   if (kr != KERN_SUCCESS) {
     return false;
   }
 
   // Write the data
   memcpy(address, data, size);
-
-  // Restore original protection
+  
+  // Restore protection
   mach_vm_protect(
     mach_task_self(),
-    reinterpret_cast<mach_vm_address_t>(address),
-    size,
+    page_start,
+    page_size,
     FALSE,
     VM_PROT_READ | VM_PROT_EXECUTE
   );
+  
+  // Invalidate instruction cache
+  sys_icache_invalidate(address, size);
 
   return true;
 #elif defined(__linux__)
